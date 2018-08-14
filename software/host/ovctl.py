@@ -155,14 +155,24 @@ class OutputCustom:
 
 
 class OutputPcap:
-    LINK_TYPE = 255 #FIXME
+    LINK_TYPE = 147 #FIXME
+
 
     def __init__(self, output):
         self.output = output
+        self.last_ts = 0
+        self.ts_offset = 0
         self.output.write(struct.pack("IHHIIII", 0xa1b2c3d4, 2, 4, 0, 0, 1<<20, self.LINK_TYPE))
 
     def handle_usb(self, ts, pkt, flags):
-        self.output.write(struct.pack("IIIIH", 0, 0, len(pkt) + 2, len(pkt) + 2, flags))
+        if ts < self.last_ts:
+            self.ts_offset += 0x1000000
+        self.last_ts = ts
+        timestamp_scaled = (ts + self.ts_offset) / 60e6
+        seconds = int(timestamp_scaled)
+        milliseconds = int((timestamp_scaled - seconds) * 1000000)
+
+        self.output.write(struct.pack("IIIIH", seconds, milliseconds, len(pkt) + 2, len(pkt) + 2, flags))
         self.output.write(pkt)
 
 def do_sdramtests(dev, cb=None, tests = range(0, 6)):
